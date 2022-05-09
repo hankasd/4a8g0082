@@ -1,3 +1,4 @@
+import math
 from PIL import ImageTk, Image
 import cv2
 import tkinter as tk
@@ -367,6 +368,89 @@ def mouse( event, x, y, flags, param):
         #將座標點用圓形顯示出來
         cv2.circle(tempimg, (x, y), 4, (0, 255, 255), thickness = -1)
         cv2.imshow("image", tempimg)
+# 之後新增註解
+def canney():
+    max_lowThreshold = 100
+    window_name = 'Edge Map'
+    title_trackbar = 'Min Threshold:'
+    ratio = 3
+    kernel_size = 3
+    def CannyThreshold(val):
+        low_threshold = val
+        img_blur = cv2.blur(src_gray, (3,3))
+        detected_edges = cv2.Canny(img_blur, low_threshold, low_threshold*ratio, kernel_size)
+        mask = detected_edges != 0
+        dst = src * (mask[:,:,None].astype(src.dtype))
+        cv2.imshow(window_name, dst)
+    src = tempimg
+    src_gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+    cv2.namedWindow(window_name)
+    cv2.createTrackbar(title_trackbar, window_name , 0, max_lowThreshold, CannyThreshold)
+    CannyThreshold(0)
+    cv2.waitKey()
+def Hough_transform():
+    src = cv2.cvtColor(tempimg, cv2.COLOR_BGR2GRAY)
+    dst = cv2.Canny(src, 50, 200, None, 3)
+    
+    # Copy edges to the images that will display the results in BGR
+    cdst = cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR)
+    cdstP = np.copy(cdst)
+    
+    lines = cv2.HoughLines(dst, 1, np.pi / 180, 150, None, 0, 0)
+    
+    if lines is not None:
+        for i in range(0, len(lines)):
+            rho = lines[i][0][0]
+            theta = lines[i][0][1]
+            a = math.cos(theta)
+            b = math.sin(theta)
+            x0 = a * rho
+            y0 = b * rho
+            pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
+            pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
+            cv2.line(cdst, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
+    linesP = cv2.HoughLinesP(dst, 1, np.pi / 180, 50, None, 50, 10)
+    
+    if linesP is not None:
+        for i in range(0, len(linesP)):
+            l = linesP[i][0]
+            cv2.line(cdstP, (l[0], l[1]), (l[2], l[3]), (0,0,255), 3, cv2.LINE_AA)
+    
+    cv2.imshow("Source", src)
+    cv2.imshow("Detected Lines (in red) - Standard Hough Line Transform", cdst)
+    cv2.imshow("Detected Lines (in red) - Probabilistic Line Transform", cdstP)
+    cv2.waitKey()
+def Harris_corner():
+    source_window = 'Source image'
+    corners_window = 'Corners detected'
+    max_thresh = 255
+    def cornerHarris_demo(val):
+        thresh = val
+    # Detector parameters
+        blockSize = 2
+        apertureSize = 3
+        k = 0.04
+    # Detecting corners
+        dst = cv2.cornerHarris(src, blockSize, apertureSize, k)
+    # Normalizing
+        dst_norm = np.empty(dst.shape, dtype=np.float32)
+        cv2.normalize(dst, dst_norm, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)
+        dst_norm_scaled = cv2.convertScaleAbs(dst_norm)
+    # Drawing a circle around corners
+        for i in range(dst_norm.shape[0]):
+            for j in range(dst_norm.shape[1]):
+                if int(dst_norm[i,j]) > thresh:
+                    cv2.circle(dst_norm_scaled, (j,i), 5, (0), 2)
+    # Showing the result
+        cv2.namedWindow(corners_window)
+        cv2.imshow(corners_window, dst_norm_scaled)
+
+    src = cv2.cvtColor(tempimg, cv2.COLOR_BGR2GRAY)
+    cv2.namedWindow(source_window)
+    thresh = 200 # initial threshold
+    cv2.createTrackbar('Threshold: ', source_window, thresh, max_thresh, cornerHarris_demo)
+    cv2.imshow(source_window, src)
+    cv2.waitKey()
 root = tk.Tk()
 root.title('opencv_GUI')
 #利用tk內建Menu來完成GUI
@@ -402,8 +486,16 @@ img_set_Menu.add_command( label ='平移', command = Panning)
 img_set_Menu.add_command(label ='旋轉', command = Rotary)
 img_set_Menu.add_command( label ='仿射轉換', command = affine_transform)
 img_set_Menu.add_command( label ='透射轉換', command = perspective_transform)
+
+img_set_Menu = tk.Menu(menubar, tearoff = 0)
+menubar.add_cascade(label ='新增功能', menu = img_set_Menu)
+img_set_Menu.add_command( label ='canney edge detector', command = canney)
+img_set_Menu.add_command( label ='Hough transform', command = Hough_transform)
+img_set_Menu.add_command( label ='Harris corner', command = Harris_corner)
+
+
 #將tk視窗預設500*500大小
-root.geometry('500x500')
+root.geometry('600x500')
 #可自由調整視窗大小
 root.resizable(1, 1)
 
