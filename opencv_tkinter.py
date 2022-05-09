@@ -495,7 +495,7 @@ img_set_Menu.add_command( label ='Harris corner', command = Harris_corner)
 
 
 #將tk視窗預設500*500大小
-root.geometry('600x500')
+root.geometry('700x500')
 #可自由調整視窗大小
 root.resizable(1, 1)
 
