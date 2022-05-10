@@ -1,3 +1,3 @@
-#新增功能
-find contour
-bounding box
+新增2項功能
+#find contour
+#bounding box
