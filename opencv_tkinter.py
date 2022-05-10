@@ -1,4 +1,6 @@
 import math
+from random import random
+from xml.dom import HierarchyRequestErr
 from PIL import ImageTk, Image
 import cv2
 import tkinter as tk
@@ -6,6 +8,7 @@ import tkinter.messagebox
 from tkinter import Toplevel, filedialog
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 global drawing
 changeSpeed = 200
 #開檔
@@ -451,6 +454,65 @@ def Harris_corner():
     cv2.createTrackbar('Threshold: ', source_window, thresh, max_thresh, cornerHarris_demo)
     cv2.imshow(source_window, src)
     cv2.waitKey()
+def find_contour():
+    def contour_threshould_callback(val):
+        threshould = val
+        canny_output = cv2.Canny(src_gray , threshould , threshould * 2)
+        contours , hierarchy = cv2.findContours(canny_output , cv2.RETR_TREE , cv2.CHAIN_APPROX_SIMPLE)
+
+        drawing = np.zeros((canny_output.shape[0], canny_output.shape[1], 3), dtype=np.uint8)
+        for i in range(len(contours)):
+            color = (random.randint(0,256), random.randint(0,256), random.randint(0,256))
+            cv2.drawContours(drawing, contours, i, color, 2, cv2.LINE_8, hierarchy, 0)
+        cv2.imshow('contours' , drawing)
+    filepath = filedialog.askopenfilename()
+    src = cv2.imread(filepath)
+    src_gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+    src_gray = cv2.blur(src_gray, (3, 3))
+    
+    sw = 'source image'
+    cv2.namedWindow(sw)
+    cv2.imshow(sw, src)
+    max = 255
+    thresh = 100
+    cv2.createTrackbar('treshould',  sw ,thresh , max , contour_threshould_callback)
+    contour_threshould_callback(thresh)
+    cv2.waitKey()
+def bounding_box():
+    def bounding_box_callback(val):
+        threshould = val
+        canny_output = cv2.Canny(src_gray , threshould , threshould * 2)
+        contours , hierarchy = cv2.findContours(canny_output , cv2.RETR_TREE , cv2.CHAIN_APPROX_SIMPLE)
+
+        contours_poly = [None]*len(contours)
+        boundRect = [None]*len(contours)
+        centers = [None]*len(contours)
+        radius = [None]*len(contours)
+        for i, c in enumerate(contours):
+            contours_poly[i] = cv2.approxPolyDP(c, 3, True)
+            boundRect[i] = cv2.boundingRect(contours_poly[i])
+            centers[i], radius[i] = cv2.minEnclosingCircle(contours_poly[i])
+        drawing = np.zeros((canny_output.shape[0], canny_output.shape[1], 3), dtype=np.uint8)   
+        for i in range(len(contours)):
+            color = (random.randint(0,256), random.randint(0,256), random.randint(0,256))
+            cv2.drawContours(drawing, contours_poly, i, color)
+            #cv2.rectangle(drawing, (int(boundRect[i][0]), int(boundRect[i][1])),\(int(boundRect[i][0]+boundRect[i][2]), int(boundRect[i][1]+boundRect[i][3])), color, 2)
+            cv2.circle(drawing, (int(centers[i][0]), int(centers[i][1])), int(radius[i]), color, 2)
+        cv2.imshow("bounding_box" , drawing)
+    filepath = filedialog.askopenfilename()
+    src = cv2.imread(filepath)
+    src_gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+    src_gray = cv2.blur(src_gray, (3, 3))
+    
+    sw = 'source image'
+    cv2.namedWindow(sw)
+    cv2.imshow(sw, src)
+    max = 255
+    thresh = 100
+    cv2.createTrackbar('treshould',  sw ,thresh , max , bounding_box_callback)
+    bounding_box_callback(thresh)
+    cv2.waitKey()
+    
 root = tk.Tk()
 root.title('opencv_GUI')
 #利用tk內建Menu來完成GUI
@@ -492,7 +554,9 @@ menubar.add_cascade(label ='新增功能', menu = img_set_Menu)
 img_set_Menu.add_command( label ='canney edge detector', command = canney)
 img_set_Menu.add_command( label ='Hough transform', command = Hough_transform)
 img_set_Menu.add_command( label ='Harris corner', command = Harris_corner)
-
+img_set_Menu.add_separator()
+img_set_Menu.add_command( label ='find contour', command = find_contour)
+img_set_Menu.add_command( label ='bounding box', command = bounding_box)
 
 #將tk視窗預設500*500大小
 root.geometry('700x500')
