@@ -562,7 +562,7 @@ img_set_Menu.add_command( label ='bounding box', command = bounding_box)
 root.geometry('700x500')
 #可自由調整視窗大小
 root.resizable(1, 1)
-#test
+
 # 显示菜单
 root.config(menu=menubar)
 
