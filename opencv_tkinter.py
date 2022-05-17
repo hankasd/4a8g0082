@@ -1,3 +1,6 @@
+import math
+from random import random
+from xml.dom import HierarchyRequestErr
 from PIL import ImageTk, Image
 import cv2
 import tkinter as tk
@@ -5,6 +8,7 @@ import tkinter.messagebox
 from tkinter import Toplevel, filedialog
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 global drawing
 changeSpeed = 200
 #開檔
@@ -367,6 +371,159 @@ def mouse( event, x, y, flags, param):
         #將座標點用圓形顯示出來
         cv2.circle(tempimg, (x, y), 4, (0, 255, 255), thickness = -1)
         cv2.imshow("image", tempimg)
+def canny():
+    max_lowThreshold = 100
+    window_name = 'Edge Map'
+    title_trackbar = 'Min Threshold:'
+    ratio = 3
+    kernel_size = 3
+    def CannyThreshold(val):
+        low_threshold = val #canny的第一個門檻值 threshold1
+        img_blur = cv2.blur(src_gray, (3,3))  #平均濾波
+        detected_edges = cv2.Canny(img_blur, low_threshold, low_threshold*ratio, kernel_size) #利用canny做邊緣偵測
+        mask = detected_edges != 0  
+        dst = src * (mask[:,:,None].astype(src.dtype))
+        cv2.imshow(window_name, dst)
+    src = tempimg #圖片
+    src_gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)# 將圖片轉成灰階
+    cv2.namedWindow(window_name)
+    cv2.createTrackbar(title_trackbar, window_name , 0, max_lowThreshold, CannyThreshold)#建立滑動軸
+    CannyThreshold(0)
+    cv2.waitKey()
+
+def Hough_transform():
+    src = cv2.cvtColor(tempimg, cv2.COLOR_BGR2GRAY) #灰階
+    dst = cv2.Canny(src, 50, 200, None, 3) #計算edge值
+    
+    cdst = cv2.cvtColor(dst, cv2.COLOR_GRAY2BGR) # 將edge值轉成RGB
+    cdstP = np.copy(cdst) 
+    
+    lines = cv2.HoughLines(dst, 1, np.pi / 180, 150, None, 0, 0) #使用標準霍夫變換在圖像中找線
+    
+    if lines is not None: 
+        for i in range(0, len(lines)): #遞廻輸出 lines
+            #將線從頭到尾都畫線
+            rho = lines[i][0][0]     
+            theta = lines[i][0][1] 
+            a = math.cos(theta)
+            b = math.sin(theta)
+            x0 = a * rho
+            y0 = b * rho
+            pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
+            pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
+            cv2.line(cdst, pt1, pt2, (0,0,255), 3, cv2.LINE_AA) 
+    linesP = cv2.HoughLinesP(dst, 1, np.pi / 180, 50, None, 50, 10)#使用概率霍夫變換在圖像中找線
+    
+    if linesP is not None:
+        for i in range(0, len(linesP)): 
+            #只畫起點到終點
+            l = linesP[i][0]
+            cv2.line(cdstP, (l[0], l[1]), (l[2], l[3]), (0,0,255), 3, cv2.LINE_AA)
+    
+    cv2.imshow("Source", src)
+    cv2.imshow("Detected Lines (in red) - Standard Hough Line Transform", cdst) #用標準找的
+    cv2.imshow("Detected Lines (in red) - Probabilistic Line Transform", cdstP) #用概率找的
+    cv2.waitKey()
+
+def Harris_corner():
+    source_window = 'Source image'
+    corners_window = 'Corners detected'
+    max_thresh = 255
+    def cornerHarris_demo(val):
+        thresh = val
+    # cornerHarris 的參數設定
+        blockSize = 2 #角點檢測中要考慮的領域大小
+        apertureSize = 3  # Sobel 求導中使用的核的大小
+        k = 0.04 #Harris 角點檢測方程中的常數
+    #  角點檢測
+        dst = cv2.cornerHarris(src, blockSize, apertureSize, k)
+    # 標準化
+        dst_norm = np.empty(dst.shape, dtype=np.float32) 
+        cv2.normalize(dst, dst_norm, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX)  
+        dst_norm_scaled = cv2.convertScaleAbs(dst_norm) #追蹤
+    # 對偵測到的角點畫圓形
+        for i in range(dst_norm.shape[0]):
+            for j in range(dst_norm.shape[1]):
+                if int(dst_norm[i,j]) > thresh:
+                    cv2.circle(dst_norm_scaled, (j,i), 5, (0), 2) 
+        cv2.namedWindow(corners_window)
+        cv2.imshow(corners_window, dst_norm_scaled)
+
+    src = cv2.cvtColor(tempimg, cv2.COLOR_BGR2GRAY) #灰階
+    cv2.namedWindow(source_window)
+    thresh = 200 # 初始滑輪值
+    cv2.createTrackbar('Threshold: ', source_window, thresh, max_thresh, cornerHarris_demo) #滑動軸
+    cv2.imshow(source_window, src)
+    cv2.waitKey()
+
+def find_contour():
+    def contour_threshould_callback(val):
+        threshould = val
+        canny_output = cv2.Canny(src_gray , threshould , threshould * 2) #對圖進行邊緣測試
+
+        # RETR_TREE 檢測所有輪廓，建立完整的層次結構，CHAIN_APPROX_SIMPLE 垂直和對角線段，只留下端點。例如矩形輪廓可以用4個點編碼
+        contours , hierarchy = cv2.findContours(canny_output , cv2.RETR_TREE , cv2.CHAIN_APPROX_SIMPLE)
+        drawing = np.zeros((canny_output.shape[0], canny_output.shape[1], 3), dtype=np.uint8)
+        for i in range(len(contours)): #將找到的輪廓用遞迴顯示出來
+            color = (random.randint(0,256), random.randint(0,256), random.randint(0,256)) #用亂數隨機取RGB值
+            cv2.drawContours(drawing, contours, i, color, 2, cv2.LINE_8, hierarchy, 0) #畫出輪廓
+        cv2.imshow('contours' , drawing)
+    #讀檔
+    filepath = filedialog.askopenfilename()
+    src = cv2.imread(filepath)
+
+    src_gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY) #灰階
+    src_gray = cv2.blur(src_gray, (3, 3))  # 平均濾波
+    sw = 'source image'
+    cv2.namedWindow(sw)
+    cv2.imshow(sw, src)
+    max = 255 #最大值
+    thresh = 100 #初始滑輪值
+    cv2.createTrackbar('treshould',  sw ,thresh , max , contour_threshould_callback) #滑輪值
+    contour_threshould_callback(thresh)
+    cv2.waitKey()
+
+def bounding_box():
+
+    def bounding_box_callback(val):
+        #跟find_contour前面一樣，邊緣測試 ， 找出輪廓
+        threshould = val
+        canny_output = cv2.Canny(src_gray , threshould , threshould * 2)
+        
+        contours , hierarchy = cv2.findContours(canny_output , cv2.RETR_TREE , cv2.CHAIN_APPROX_SIMPLE)
+        # contours 輪廓點。列表格式，每一個元素為一個3維數組（其形狀為（n,1,2），其中n表示輪廓點個數，2表示像素點坐標）,表示一個輪廓
+        contours_poly = [None]*len(contours) 
+        boundRect = [None]*len(contours)
+        centers = [None]*len(contours)
+        radius = [None]*len(contours)
+        for i, c in enumerate(contours): # 把找到的 輪廓點 組合為一個索引序列
+            #連續光滑曲線折線化 ， c : 輸入曲線 ， 3 : 輸出折線 ， True : 曲線是否閉合的標誌位
+            contours_poly[i] = cv2.approxPolyDP(c, 3, True)
+            # 會傳回輪廓點圓心 X ， Y 以及半徑
+            centers[i], radius[i] = cv2.minEnclosingCircle(contours_poly[i])
+        drawing = np.zeros((canny_output.shape[0], canny_output.shape[1], 3), dtype=np.uint8)   
+        for i in range(len(contours)):
+            color = (random.randint(0,256), random.randint(0,256), random.randint(0,256))
+            cv2.drawContours(drawing, contours_poly, i, color)
+            #對找到的輪廓點外圍畫圓形
+            cv2.circle(drawing, (int(centers[i][0]), int(centers[i][1])), int(radius[i]), color, 2) 
+        cv2.imshow("bounding_box" , drawing)
+    #讀檔
+    filepath = filedialog.askopenfilename()
+    src = cv2.imread(filepath)
+    #灰階 ， 平均濾波
+    src_gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+    src_gray = cv2.blur(src_gray, (3, 3))
+    
+    sw = 'source image'
+    cv2.namedWindow(sw)
+    cv2.imshow(sw, src)
+    max = 255 #最大值
+    thresh = 100 #初始值
+    cv2.createTrackbar('treshould',  sw ,thresh , max , bounding_box_callback) #滑輪值
+    bounding_box_callback(thresh)
+    cv2.waitKey()
+    
 root = tk.Tk()
 root.title('opencv_GUI')
 #利用tk內建Menu來完成GUI
@@ -402,8 +559,18 @@ img_set_Menu.add_command( label ='平移', command = Panning)
 img_set_Menu.add_command(label ='旋轉', command = Rotary)
 img_set_Menu.add_command( label ='仿射轉換', command = affine_transform)
 img_set_Menu.add_command( label ='透射轉換', command = perspective_transform)
+
+img_set_Menu = tk.Menu(menubar, tearoff = 0)
+menubar.add_cascade(label ='新增功能', menu = img_set_Menu)
+img_set_Menu.add_command( label ='canny edge detector', command = canny)
+img_set_Menu.add_command( label ='Hough transform', command = Hough_transform)
+img_set_Menu.add_command( label ='Harris corner', command = Harris_corner)
+img_set_Menu.add_separator()
+img_set_Menu.add_command( label ='find contour', command = find_contour)
+img_set_Menu.add_command( label ='bounding box', command = bounding_box)
+
 #將tk視窗預設500*500大小
-root.geometry('500x500')
+root.geometry('700x500')
 #可自由調整視窗大小
 root.resizable(1, 1)
 
