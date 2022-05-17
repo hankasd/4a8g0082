@@ -523,7 +523,49 @@ def bounding_box():
     cv2.createTrackbar('treshould',  sw ,thresh , max , bounding_box_callback) #滑輪值
     bounding_box_callback(thresh)
     cv2.waitKey()
-    
+def basic_operations():
+    src = tempimg
+    cv2.imshow('orign_img' , src)
+    src_gray = cv2.cvtColor(src, cv2.COLOR_BGR2GRAY)
+    ret , thresh = cv2.threshold(src_gray , 127 , 255 , 0) # 二值化
+    cv2.imshow('Threshold' , thresh)
+    erosion_size = 1
+                                                                        #大小                                           錨點位置
+    erosion_element = cv2.getStructuringElement(cv2.MORPH_RECT , (2 * erosion_size + 1 , 2 * erosion_size + 1 ) , (erosion_size , erosion_size))
+    erosion = cv2.erode(thresh , erosion_element)
+    cv2.imshow('erosion_img' , erosion)
+    cv2.waitKey()
+def advanced_morphology():
+    # 設定滑輪值 用哪個核心的形狀
+    def morph_shape(val):
+        # 矩形
+        if val == 0 :
+            return cv2.MORPH_RECT
+        #十字形
+        elif val == 1:
+            return cv2.MORPH_CROSS
+        # 橢圓
+        elif val == 2:
+            return cv2.MORPH_ELLIPSE
+    def erosion_callback(val):
+        erosion_size = val
+        #取得滑輪值 用哪個核心的形狀
+        erosion_shape = morph_shape(cv2.getTrackbarPos(element_shape , erosion_window))
+        element = cv2.getStructuringElement(erosion_shape , (2 * erosion_size + 1 , 2 * erosion_size + 1 ) , (erosion_size , erosion_size)) 
+        erosion = cv2.erode(src , element) # 腐蝕影像
+        cv2.imshow(erosion_window , erosion)
+    max_element_size = 2 
+    max_kernel_size = 21
+    element_shape = 'Element:\n 0: Rectangle\n 1: Cross\n 2: Ellipse'
+    kernel_size = 'Kernel size:\n 2n+1'
+    erosion_window = 'Erosion'
+    dilation_window = 'Dilation'
+    src = tempimg
+    cv2.imshow('soure image' , src)
+    cv2.namedWindow(erosion_window)
+    cv2.createTrackbar(element_shape , erosion_window , 0 , max_element_size , erosion_callback)
+    #當kernel 越大 代表腐蝕的越深
+    cv2.createTrackbar(kernel_size , erosion_window , 1 , max_kernel_size , erosion_callback)
 root = tk.Tk()
 root.title('opencv_GUI')
 #利用tk內建Menu來完成GUI
@@ -568,7 +610,8 @@ img_set_Menu.add_command( label ='Harris corner', command = Harris_corner)
 img_set_Menu.add_separator()
 img_set_Menu.add_command( label ='find contour', command = find_contour)
 img_set_Menu.add_command( label ='bounding box', command = bounding_box)
-
+img_set_Menu.add_command( label ='basic operations', command = basic_operations)
+img_set_Menu.add_command( label ='advanced morphology', command = advanced_morphology)
 #將tk視窗預設500*500大小
 root.geometry('700x500')
 #可自由調整視窗大小
